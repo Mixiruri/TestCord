@@ -9,7 +9,9 @@ import "./styles.css";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { TestcordDevs } from "@utils/constants";
+import { localStorage } from "@utils/localStorage";
 import definePlugin, { OptionType } from "@utils/types";
+import { React, ReactDOM } from "@webpack/common";
 
 import { LivePluginEditor } from "./components/Editor";
 
@@ -21,6 +23,17 @@ export interface LivePlugin {
     code: string;
     enabled: boolean;
     description?: string;
+}
+
+// Use a simpler type for the plugin instance
+interface LivePluginInstance {
+    name: string;
+    description?: string;
+    authors?: Array<{ name: string; id?: bigint; }>;
+    start?: () => void;
+    stop?: () => void;
+    started?: boolean;
+    [key: string]: unknown;
 }
 
 export const classFactory = classNameFactory("vc-live-plugin-editor-");
@@ -77,79 +90,181 @@ export function createPlugin(name: string, code: string = defaultPluginCode): Li
 }
 
 // Expose for hot-reloading
-export const livePlugins: Map<string, { plugin: LivePlugin; instance: any; }> = new Map();
+export const livePlugins: Map<string, { plugin: LivePlugin; instance: LivePluginInstance; }> = new Map();
 
-export function loadLivePlugin(plugin: LivePlugin): boolean {
+export function loadLivePlugin(pluginData: LivePlugin): boolean {
+    console.log("[LivePluginEditor] Loading plugin:", pluginData.name);
+
     try {
         // Stop existing instance if any
-        if (livePlugins.has(plugin.id)) {
-            const existing = livePlugins.get(plugin.id);
-            if (existing?.instance?.stop) {
-                existing.instance.stop();
-            }
+        if (livePlugins.has(pluginData.id)) {
+            unloadPlugin(pluginData.id);
         }
 
-        if (!plugin.enabled) {
-            livePlugins.delete(plugin.id);
+        if (!pluginData.enabled) {
+            livePlugins.delete(pluginData.id);
             return true;
         }
 
-        // Create a sandboxed function to evaluate the plugin code
-        const wrappedCode = `
-            (function(definePlugin, VencordNative, module, exports, require) {
-                ${plugin.code}
-            })
-        `;
+        // Create a sandboxed environment to evaluate the plugin code
+        let capturedPlugin: LivePluginInstance | null = null;
 
-        const factory = new Function("definePlugin", "VencordNative", "module", "exports", "require", `
-            return (${wrappedCode})(definePlugin, VencordNative, module, exports, require);
-        `);
+        try {
+            // Create a custom definePlugin that captures the result
+            const customDefinePlugin = function (p: LivePluginInstance) {
+                capturedPlugin = p;
+                return p;
+            };
 
-        // Create module context
-        const moduleObj = { exports: {} };
-        const requireObj = (path: string) => {
-            if (path.startsWith("@")) {
-                return () => ({});
-            }
-            return () => ({});
-        };
+            // Get common Vencord APIs that plugins commonly use
+            const VenCord = Vencord;
+            const VenCordNative = VencordNative;
+            const Plugins = Vencord?.Plugins;
+            const Themes = Vencord?.Themes;
+            const Webpack = Vencord?.Webpack;
+            const API = Vencord?.Api;
 
-        const pluginFactory = factory(
-            (def: any) => def,
-            VencordNative,
-            moduleObj,
-            moduleObj.exports,
-            requireObj
-        );
+            // Get common Discord stores
+            const UserStore = Vencord?.Webpack?.findByProps("getCurrentUser", "getUser");
+            const ChannelStore = Vencord?.Webpack?.findByProps("getChannel", "getDMFromUserId");
+            const GuildStore = Vencord?.Webpack?.findByProps("getGuild", "getGuilds");
+            const MessageStore = Vencord?.Webpack?.findByProps("getMessage", "getMessages");
+            const SelectedChannelStore = Vencord?.Webpack?.findByProps("getChannelId", "getLastSelectedChannelId");
+            const SelectedMessageStore = Vencord?.Webpack?.findByProps("getSelectedMessageId");
+            const UserProfileStore = Vencord?.Webpack?.findByProps("getUserProfile");
+            const RelationshipStore = Vencord?.Webpack?.findByProps("isFriend", "getRelationship");
+            const GuildMemberStore = Vencord?.Webpack?.findByProps("getMember", "getMembers");
 
-        if (pluginFactory && typeof pluginFactory === "function") {
-            const instance = pluginFactory();
-            livePlugins.set(plugin.id, { plugin, instance });
+            // Create the sandbox with common globals available in Vencord plugins
+            const sandbox = new Function(
+                "definePlugin",
+                "Vencord",
+                "VencordNative",
+                "DiscordNative",
+                "React",
+                "ReactDOM",
+                "console",
+                "navigator",
+                "window",
+                "document",
+                "localStorage",
+                "fetch",
+                "setTimeout",
+                "setInterval",
+                "clearTimeout",
+                "clearInterval",
+                // Vencord APIs
+                "Plugins",
+                "Themes",
+                "Webpack",
+                "API",
+                // Discord Stores
+                "UserStore",
+                "ChannelStore",
+                "GuildStore",
+                "MessageStore",
+                "SelectedChannelStore",
+                "SelectedMessageStore",
+                "UserProfileStore",
+                "RelationshipStore",
+                "GuildMemberStore",
+                `
+                ${pluginData.code}
+            `);
 
-            if (instance.start) {
-                instance.start();
-            }
-            return true;
+            sandbox(
+                customDefinePlugin,
+                VenCord,
+                VenCordNative,
+                DiscordNative,
+                React,
+                ReactDOM,
+                console,
+                navigator,
+                window,
+                document,
+                localStorage,
+                fetch,
+                setTimeout,
+                setInterval,
+                clearTimeout,
+                clearInterval,
+                // Vencord APIs
+                Plugins,
+                Themes,
+                Webpack,
+                API,
+                // Discord Stores
+                UserStore,
+                ChannelStore,
+                GuildStore,
+                MessageStore,
+                SelectedChannelStore,
+                SelectedMessageStore,
+                UserProfileStore,
+                RelationshipStore,
+                GuildMemberStore
+            );
+
+        } catch (evalError) {
+            console.error("[LivePluginEditor] Error evaluating plugin code:", evalError);
+            return false;
         }
+
+        if (!capturedPlugin) {
+            console.error("[LivePluginEditor] No plugin captured - definePlugin was not called");
+            return false;
+        }
+
+        const pluginInstance: LivePluginInstance = capturedPlugin;
+
+        // Ensure the plugin name matches
+        pluginInstance.name = pluginData.name;
+
+        livePlugins.set(pluginData.id, { plugin: pluginData, instance: pluginInstance });
+
+        // Start the plugin
+        try {
+            if (pluginInstance.start) {
+                console.log("[LivePluginEditor] Calling start() on plugin:", pluginData.name);
+                pluginInstance.start();
+            }
+            pluginInstance.started = true;
+            console.log(`[LivePluginEditor] Started plugin: ${pluginData.name}`);
+        } catch (e) {
+            console.error(`[LivePluginEditor] Error starting plugin ${pluginData.name}:`, e);
+        }
+
+        return true;
     } catch (e) {
         console.error("[LivePluginEditor] Failed to load plugin:", e);
+        return false;
     }
-    return false;
 }
 
 export function unloadPlugin(pluginId: string): boolean {
     const entry = livePlugins.get(pluginId);
-    if (entry?.instance?.stop) {
-        try {
-            entry.instance.stop();
-        } catch (e) {
-            console.error("[LivePluginEditor] Error stopping plugin:", e);
+    if (!entry) return false;
+
+    console.log("[LivePluginEditor] Unloading plugin:", entry.plugin.name);
+
+    const { instance } = entry;
+
+    // Stop the plugin
+    try {
+        if (instance.stop && instance.started) {
+            instance.stop();
         }
+        instance.started = false;
+    } catch (e) {
+        console.error("[LivePluginEditor] Error stopping plugin:", e);
     }
+
     return livePlugins.delete(pluginId);
 }
 
 export function reloadPlugin(plugin: LivePlugin): boolean {
+    console.log("[LivePluginEditor] Reloading plugin:", plugin.name);
     unloadPlugin(plugin.id);
     return loadLivePlugin(plugin);
 }
@@ -160,6 +275,7 @@ export default definePlugin({
     authors: [TestcordDevs.x2b],
     settings,
     start() {
+        console.log("[LivePluginEditor] Starting LivePluginEditor");
         const plugins = getStoredPlugins();
         plugins.forEach(plugin => {
             if (plugin.enabled) {
@@ -168,7 +284,7 @@ export default definePlugin({
         });
     },
     stop() {
-        livePlugins.forEach((_, id) => {
+        livePlugins.forEach((entry, id) => {
             unloadPlugin(id);
         });
     }

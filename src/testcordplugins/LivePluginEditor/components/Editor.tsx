@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Button, Text, TextArea, useState } from "@webpack/common";
-import React, { useEffect, useRef } from "react";
+import { Button, Text, TextArea, useEffect, useRef, useState } from "@webpack/common";
 
 import { classFactory, defaultPluginCode, generateId, getStoredPlugins, LivePlugin, livePlugins, loadLivePlugin, reloadPlugin, savePlugins } from "../index";
 
@@ -108,7 +107,7 @@ export function LivePluginEditor() {
                 <div className={classFactory("sidebar-header")}>
                     <Text style={{ flex: 1 }}>Plugins</Text>
                     <Button
-                        look={Button.Looks.BLANK}
+                        look={Button.Looks.LINK}
                         onClick={() => setShowNewPluginForm(true)}
                     >
                         +
@@ -119,7 +118,7 @@ export function LivePluginEditor() {
                     <div className={classFactory("new-plugin-form")}>
                         <TextArea
                             value={newPluginName}
-                            onChange={(e: any) => setNewPluginName(e.target.value)}
+                            onChange={setNewPluginName}
                             placeholder="Plugin name..."
                             style={{ marginBottom: "8px" }}
                         />
@@ -166,19 +165,23 @@ export function LivePluginEditor() {
                         <div className={classFactory("editor-header")}>
                             <TextArea
                                 value={editName}
-                                onChange={(e: any) => setEditName(e.target.value)}
+                                onChange={setEditName}
                                 placeholder="Plugin name..."
-                                style={{ flex: 1, marginRight: "8px" }}
+                                style={{ flex: 1, marginBottom: "8px" }}
                             />
-                            <Button look={Button.Looks.FILLED} color={Button.Colors.GREEN} onClick={handleSaveCode}>Save</Button>
-                            <Button look={Button.Looks.FILLED} onClick={handleReload} style={{ marginLeft: "8px" }}>Reload</Button>
-                            <Button look={Button.Looks.FILLED} color={Button.Colors.RED} onClick={handleDeleteIcon} style={{ marginLeft: "8px" }}>Delete</Button>
+                            <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                                <Button look={Button.Looks.FILLED} color={Button.Colors.GREEN} onClick={handleSaveCode}>Save</Button>
+                                <Button look={Button.Looks.FILLED} onClick={handleReload}>Reload</Button>
+                            </div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <Button look={Button.Looks.FILLED} color={Button.Colors.RED} onClick={handleDeleteIcon}>Delete</Button>
+                            </div>
                         </div>
                         <TextArea
                             ref={editorRef}
                             className={classFactory("code-editor")}
                             value={editCode}
-                            onChange={(e: any) => setEditCode(e.target.value)}
+                            onChange={setEditCode}
                             placeholder="// Write your plugin code here..."
                             style={{
                                 fontFamily: "monospace",
