@@ -25,6 +25,7 @@ import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
 import { Logger } from "@utils/Logger";
 import { shouldShowContributorBadge, shouldShowEquicordContributorBadge, shouldShowTestcordAdminBadge, shouldShowTestcordContributorBadge } from "@utils/misc";
+import { isTestcordOwner } from "@utils/testcordAdmins";
 import definePlugin from "@utils/types";
 import { ContextMenuApi, Menu, Toasts, UserStore } from "@webpack/common";
 
@@ -37,6 +38,7 @@ const EQUICORD_CONTRIBUTOR_BADGE = "https://equicord.org/assets/favicon.png";
 const TESTCORD_CONTRIBUTOR_BADGE = "https://raw.githubusercontent.com/x2b1/TestCord/main/browser/icon.png";
 const USERPLUGIN_CONTRIBUTOR_BADGE = "https://equicord.org/assets/icons/misc/userplugin.png";
 const TESTCORD_ADMIN_BADGE = "https://raw.githubusercontent.com/x2b1/tbadges/main/adm.png";
+const TESTCORD_OWNER_BADGE = "https://raw.githubusercontent.com/x2b1/tbadges/refs/heads/main/owner.png";
 
 const ContributorBadge: ProfileBadge = {
     description: "Vencord Contributor",
@@ -100,6 +102,19 @@ const TestcordAdminBadge: ProfileBadge = {
     iconSrc: TESTCORD_ADMIN_BADGE,
     position: BadgePosition.START,
     shouldShow: ({ userId }) => shouldShowTestcordAdminBadge(userId),
+    props: {
+        style: {
+            borderRadius: "50%",
+            transform: "scale(0.9)"
+        }
+    },
+};
+
+const TestcordOwnerBadge: ProfileBadge = {
+    description: "Testcord Owner",
+    iconSrc: TESTCORD_OWNER_BADGE,
+    position: BadgePosition.START,
+    shouldShow: ({ userId }) => isTestcordOwner(userId),
     props: {
         style: {
             borderRadius: "50%",
@@ -206,7 +221,7 @@ export default definePlugin({
         }
     },
 
-    userProfileBadges: [ContributorBadge, EquicordContributorBadge, TestcordContributorBadge, TestcordAdminBadge, UserPluginContributorBadge],
+    userProfileBadges: [ContributorBadge, EquicordContributorBadge, TestcordContributorBadge, TestcordAdminBadge, TestcordOwnerBadge, UserPluginContributorBadge],
 
     async start() {
         await loadAllBadges();
