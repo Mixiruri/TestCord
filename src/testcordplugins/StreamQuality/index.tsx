@@ -197,6 +197,15 @@ function patchDesktopSourceOptions(options: Record<string, any>) {
     if (settings.store.hdrEnabled) {
         options.hdrCaptureMode = "always";
     }
+
+    if (settings.store.fpsEnabled) {
+        options.framerate = settings.store.fps;
+    }
+
+    if (settings.store.resolutionEnabled) {
+        const res = getResolutionData(settings.store.resolution);
+        options.resolution = res.height;
+    }
 }
 
 let mediaEngine: any = null;
