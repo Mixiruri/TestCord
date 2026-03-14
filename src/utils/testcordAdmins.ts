@@ -94,3 +94,4 @@ export function isTestcordDeveloper(userId: string): boolean {
     return Object.hasOwn(TestcordDevelopersById, userId);
 }
 
+// btw fuck me for making such stupid mistakes.
