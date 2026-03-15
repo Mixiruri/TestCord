@@ -83,7 +83,6 @@ export let PopoutWindowStore: t.PopoutWindowStore;
 export let ApplicationCommandIndexStore: t.ApplicationCommandIndexStore;
 export let EditMessageStore: t.EditMessageStore;
 export let QuestStore: t.QuestStore;
-export let PendingReplyStore: t.PendingReplyStore;
 export let ExperimentStore: GenericStore;
 export let UserAffinitiesStore: GenericStore;
 
