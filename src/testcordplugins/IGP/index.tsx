@@ -308,7 +308,7 @@ class KeyManager {
 
     private saveKeys(): void {
         const obj = Object.fromEntries(this.keyCache);
-        settings?.store?.knownPublicKeys = JSON.stringify(obj);
+        settings.store.knownPublicKeys = JSON.stringify(obj);
     }
 
     async importPublicKeyForUser(userId: string, armoredKey: string): Promise<StoredKey> {
