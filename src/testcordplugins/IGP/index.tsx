@@ -297,7 +297,7 @@ class KeyManager {
 
     private loadKeys(): void {
         try {
-            const stored = JSON.parse(settings.store.knownPublicKeys || "{}");
+            const stored = JSON.parse(settings?.store?.knownPublicKeys || "{}");
             this.keyCache = new Map(Object.entries(stored));
             logger.info(`Loaded ${this.keyCache.size} known public keys`);
         } catch (err) {
@@ -308,7 +308,7 @@ class KeyManager {
 
     private saveKeys(): void {
         const obj = Object.fromEntries(this.keyCache);
-        settings.store.knownPublicKeys = JSON.stringify(obj);
+        settings?.store?.knownPublicKeys = JSON.stringify(obj);
     }
 
     async importPublicKeyForUser(userId: string, armoredKey: string): Promise<StoredKey> {
